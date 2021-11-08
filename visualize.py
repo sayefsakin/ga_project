@@ -1,6 +1,6 @@
 import numpy as np
 import tkinter as tk
-
+import random
 import matplotlib
 matplotlib.use('TkAgg')
 
@@ -8,46 +8,58 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
 
+def generateRandomTasks(x_max):
+    n = random.randint(5, 20)
+    return [(random.randint(0, x_max), random.randint(10, 30)) for _ in range(n)]
+
+
 def gantt_draw():
-    # Declaring a figure "gnt"
+    color = 'tab:blue'
+    number_of_locations = 10
+    location_gap = 0.5
+    ylim = 50
+    xlim = 260
+    bar_height = (ylim / number_of_locations) - (2*location_gap)
+    location_distance = bar_height + (2*location_gap)
+
     fig, gnt = plt.subplots()
+    fig.set_size_inches(12, 6)
 
-    # Setting Y-axis limits
-    gnt.set_ylim(0, 50)
+    gnt.set_ylim(0, ylim)
+    gnt.set_xlim(0, xlim)
 
-    # Setting X-axis limits
-    gnt.set_xlim(0, 160)
+    gnt.set_xlabel('Time (nanoseconds)')
+    gnt.set_ylabel('Thread Location')
 
-    # Setting labels for x-axis and y-axis
-    gnt.set_xlabel('seconds since start')
-    gnt.set_ylabel('Processor')
+    y_ticks = list(np.arange(location_gap + (bar_height/2), ylim, location_distance))
+    y_labels = [str(i) for i in range(number_of_locations)]
+    gnt.set_yticks(y_ticks)
+    gnt.set_yticklabels(y_labels)
 
-    # Setting ticks on y-axis
-    gnt.set_yticks([15, 25, 35])
-    # Labelling tickes of y-axis
-    gnt.set_yticklabels(['1', '2', '3'])
-
-    # Setting graph attribute
     gnt.grid(True)
 
-    # Declaring a bar in schedule
-    gnt.broken_barh([(40, 50)], (30, 9), facecolors =('tab:orange'))
+    def getBarPosition(loc):
+        return (loc * (bar_height + (2*location_gap))) + location_gap
 
-    # Declaring multiple bars in at same level and same width
-    gnt.broken_barh([(110, 10), (150, 10)], (10, 9), facecolors ='tab:blue')
+    for i in range(number_of_locations):
+        t1 = generateRandomTasks(xlim)
+        gnt.broken_barh(t1, (getBarPosition(i), bar_height), facecolors=color)
 
-    gnt.broken_barh([(10, 50), (100, 20), (130, 10)], (20, 9), facecolors =('tab:red'))
     return fig
+
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.title("Gantt")
+    # YSIZE = 800
+    # root.geometry(str(YSIZE)+'x'+str(YSIZE)) #("800x800")
 
     fig = gantt_draw()
     # fig = plt.figure(1)
-    plt.ion()
-    t = np.arange(0.0,3.0,0.01)
-    s = np.sin(np.pi*t)
-    plt.plot(t,s)
+    # plt.ion()
+    # t = np.arange(0.0,3.0,0.01)
+    # s = np.sin(np.pi*t)
+    # plt.plot(t,s)
 
     canvas = FigureCanvasTkAgg(fig, master=root)
     plot_widget = canvas.get_tk_widget()
