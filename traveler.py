@@ -18,10 +18,4 @@ if __name__ == "__main__":
     # canvas.bind("<Button-1>", find_intersections_wrapper)
     canvas.grid(row=0, column=0)
 
-    HP = generateRandomDataset(problem)
-    drawHalfPlanes(HP)
-    sp = halfplane_intersect(HP)
-    drawSegments(sp, 'blue')
-    for ss in sp:
-        print('from time', ss[0][0], 'to', ss[1][0], ' leading train:', ss[2])
     root.mainloop()

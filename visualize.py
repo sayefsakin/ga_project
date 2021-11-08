@@ -13,6 +13,18 @@ def generateRandomTasks(x_max):
     return [(random.randint(0, x_max), random.randint(10, 30)) for _ in range(n)]
 
 
+def handlePanningLeft():
+    pass
+
+def handlePanningRight():
+    pass
+
+def handleZoomIn():
+    pass
+
+def handleZoomOut():
+    pass
+
 def gantt_draw():
     color = 'tab:blue'
     number_of_locations = 10

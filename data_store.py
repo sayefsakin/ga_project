@@ -2,6 +2,14 @@
 import subprocess
 import sys
 
+class Intervals:
+    def __init__(self, st, en, loc):
+        self.start_time = st
+        self.end_time = en
+        self.location = loc
+
+class KDStore:
+    pass
 
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
