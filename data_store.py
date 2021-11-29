@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import math
 import re
 import subprocess
 import sys
@@ -12,8 +13,75 @@ class Intervals:
         self.end_time = en
         self.location = loc
 
+
+class KDNode:
+    def __init__(self, start_loc, end_loc, st_time, en_time, lft=None, rt=None):
+        self.location = (start_loc, end_loc)
+        self.timestamp = (st_time, en_time)
+        self.left = lft
+        self.right = rt
+
+
+# equal time will go right, equal location will go down
 class KDStore:
-    pass
+    def __init__(self):
+        self.parsed_data = DataParser()
+        self.parsed_data.parseTraceData('data/converted')
+        self.kd_tree = self.buildKDTree()
+        # self.parsed_data.combineIntervals()
+        # s = 67063027
+
+    # ignore the cases where en_index < st_index
+    def findIntervalsInLocation(self, location, st_time, en_time):
+        st_index = self.parsed_data.sortedEventsByLocation[location].bisect((st_time,))
+        en_index = self.parsed_data.sortedEventsByLocation[location].bisect((en_time,))
+        if st_index == len(self.parsed_data.sortedEventsByLocation[location]):
+            st_index = None
+        elif self.parsed_data.sortedEventsByLocation[location][st_index][1]['Event'] == 'LEAVE':
+            st_index -= 1
+        if en_index == len(self.parsed_data.sortedEventsByLocation[location]):
+            en_index = None
+        elif self.parsed_data.sortedEventsByLocation[location][en_index][1]['Event'] == 'ENTER':  # remove the trailing enter event
+            en_index -= 1
+        return (st_index, en_index)
+
+    def buildKDTree(self):
+        return self.insertIntoKDTree(0,
+                                     len(self.parsed_data.info['locationNames'])-1,
+                                     self.parsed_data.info['domain'][0],
+                                     self.parsed_data.info['domain'][1], 0)
+
+    def insertIntoKDTree(self, start_loc_index, end_loc_index, st_time, en_time, depth):
+        if start_loc_index > end_loc_index:
+            return None
+        start_loc = self.parsed_data.info['locationNames'][start_loc_index]
+        end_loc = self.parsed_data.info['locationNames'][end_loc_index]
+        if start_loc == end_loc:
+            st, en = self.findIntervalsInLocation(start_loc, st_time, en_time)
+            if st is None or en is None:
+                return None
+            if st + 1 == en:  # this belongs to a single interval
+                st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                return KDNode(start_loc_index, end_loc_index, st_time, en_time)
+            elif en <= st:
+                return None
+        if (depth % 2) == 0:  # vertical
+            if start_loc == end_loc:
+                st, en = self.findIntervalsInLocation(start_loc, st_time, en_time)
+                if st is not None and en is not None:
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+            mid = math.floor((st_time + en_time) / 2)
+            left = self.insertIntoKDTree(start_loc_index, end_loc_index, st_time, mid, depth + 1)
+            right = self.insertIntoKDTree(start_loc_index, end_loc_index, mid+1, en_time, depth + 1)
+        else:
+            mid = math.floor((start_loc_index + end_loc_index) / 2)
+            left = self.insertIntoKDTree(start_loc_index, mid, st_time, en_time, depth + 1)
+            right = self.insertIntoKDTree(mid+1, end_loc_index, st_time, en_time, depth + 1)
+        return KDNode(start_loc_index, end_loc_index, st_time, en_time, left, right)
+
+
 
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
@@ -43,9 +111,9 @@ if __name__ == "__main__":
     print('hello')
     # path = 'data/cannon/OTF2_archive/APEX.otf2'
     # processOtf2(FakeFile(path))
-    dp = DataParser()
-    dp.parseTraceData('data/converted')
-    dp.combineIntervals()
+
+    kd_store = KDStore()
+    print('hello')
 
 
 

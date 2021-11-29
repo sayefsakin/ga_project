@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy
+import math
 import re
 from sortedcontainers import SortedList
 
@@ -87,6 +88,8 @@ class DataParser:
         currentEvent = None
         unsupportedSkippedLines = 0
         badAddAttrLines = 0
+        min_time = math.inf
+        max_time = 0
 
         with open(file, 'r') as file:
             for line in file:
@@ -111,6 +114,8 @@ class DataParser:
                     currentEvent = {'Event': eventLineMatch.group(1),
                                     'Location': eventLineMatch.group(2),
                                     'Timestamp': int(eventLineMatch.group(3))}
+                    min_time = min(min_time, currentEvent['Timestamp'])
+                    max_time = max(max_time, currentEvent['Timestamp'])
                     attrs = eventLineMatch.group(4)
                     for attrMatch in re.finditer(attrParsers[currentEvent['Event']], attrs):
                         currentEvent[attrMatch.group(1)] = attrMatch.group(2)
@@ -138,6 +143,7 @@ class DataParser:
             print('Additional attribute lines skipped: %d' % badAddAttrLines)
             print('Lines skipped because they are not yet supported: %d' % unsupportedSkippedLines)
             self.info['locationNames'] = natural_sort(self.sortedEventsByLocation.keys())
+            self.info['domain'] = [min_time, max_time]
 
     def combineIntervals(self):
         self.intervals = {}
