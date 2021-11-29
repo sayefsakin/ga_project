@@ -7,19 +7,21 @@ import sys
 from data_parser import DataParser
 
 
-class Intervals:
-    def __init__(self, st, en, loc):
-        self.start_time = st
-        self.end_time = en
-        self.location = loc
-
-
 class KDNode:
     def __init__(self, start_loc, end_loc, st_time, en_time, lft=None, rt=None):
-        self.location = (start_loc, end_loc)
+        self.location = (start_loc, end_loc)  # this is location index
         self.timestamp = (st_time, en_time)
         self.left = lft
         self.right = rt
+
+    def getTimeWindow(self):
+        return self.location[1] - self.location[0]
+
+    def isLeaf(self):
+        return self.left is None and self.right is None
+
+    def isOverlap(self, sl, el, st, et):
+        return sl <= self.location[1] and el >= self.location[0] and st <= self.timestamp[1] and et >= self.timestamp[0]
 
 
 # equal time will go right, equal location will go down
@@ -81,7 +83,29 @@ class KDStore:
             right = self.insertIntoKDTree(mid+1, end_loc_index, st_time, en_time, depth + 1)
         return KDNode(start_loc_index, end_loc_index, st_time, en_time, left, right)
 
+    def queryInRange(self, start_loc_index, end_loc_index, st_time, en_time, figure_width):
+        data = {}
+        for lc in range(start_loc_index, end_loc_index + 1):
+            data[lc] = list()
+        pixel_window = (en_time - st_time) / figure_width
 
+        def searchInKDTree(kd_node, sl_index, el_index, st, et):
+            if kd_node.getTimeWindow() == pixel_window:
+                if kd_node.isLeaf() is False:
+                    for loc in range(kd_node.location[0], kd_node.location[1] + 1):
+                        data[loc].append((kd_node.timestamp[0], 1))
+                return
+            if kd_node.isLeaf():
+                for loc in range(kd_node.location[0], kd_node.location[1] + 1):
+                    data[loc].append((kd_node.timestamp[0], kd_node.timestamp[1] - kd_node.timestamp[0] + 1))
+                return
+            if kd_node.left and kd_node.left.isOverlap(sl_index, el_index, st, et):
+                searchInKDTree(kd_node.left, sl_index, el_index, st, et)
+            if kd_node.right and kd_node.right.isOverlap(sl_index, el_index, st, et):
+                searchInKDTree(kd_node.right, sl_index, el_index, st, et)
+
+        searchInKDTree(self.kd_tree, start_loc_index, end_loc_index, st_time, en_time)
+        return data
 
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
