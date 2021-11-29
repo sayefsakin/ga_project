@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import re
 import subprocess
 import sys
+
+from data_parser import DataParser
+
 
 class Intervals:
     def __init__(self, st, en, loc):
@@ -37,7 +41,11 @@ def processOtf2(file):
 
 if __name__ == "__main__":
     print('hello')
-    path = 'data/cannon/OTF2_archive/APEX.otf2'
-    processOtf2(FakeFile(path))
+    # path = 'data/cannon/OTF2_archive/APEX.otf2'
+    # processOtf2(FakeFile(path))
+    dp = DataParser()
+    dp.parseTraceData('data/converted')
+    dp.combineIntervals()
+
 
 
