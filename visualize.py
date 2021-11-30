@@ -1,9 +1,11 @@
+import copy
+
 import numpy as np
 import tkinter as tk
 import random
 import matplotlib
-from matplotlib import ticker
-
+from matplotlib import ticker, animation
+from datetime import datetime
 from data_store import KDStore
 
 matplotlib.use('TkAgg')
@@ -24,21 +26,28 @@ class Visualize:
         self.location_gap = 0.5
         self.ylim = 50
         self.xlim = 260
-        self.bar_height = (self.ylim / self.number_of_locations) - (2*self.location_gap)
-        self.location_distance = self.bar_height + (2*self.location_gap)
+        self.bar_height = (self.ylim / self.number_of_locations) - (2 * self.location_gap)
+        self.location_distance = self.bar_height + (2 * self.location_gap)
         self.visible_x = [0, self.xlim]
         self.visible_y = [0, self.ylim]
         self.gantt = None
-        self.scroll_unit = 100000000
+        self.scroll_unit = 30000000
         self.kd_store = None
-        self.figure_width = 0
-        self.figure_height = 0
+        self.figure_width = 800  # in pixel
+        self.figure_height = 400  # in pixel
+        self.clicked_point = None
 
-    def handlePanningLeft(self):
-        pass
+    def handlePanning(self, x_value, y_value):
+        x_displace = x_value - ((self.visible_x[0] + self.visible_x[1]) / 2)
+        if x_displace > 0:
+            x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
+        else:
+            x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
+        self.visible_x[0] += x_displace
+        self.visible_x[1] += x_displace
 
-    def handlePanningRight(self):
-        pass
+        data = self.updateData()
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomIn(self, x_value, y_value):
         print(x_value, y_value, 'zoom-in')
@@ -46,40 +55,64 @@ class Visualize:
         if self.visible_x[0] + (2 * self.scroll_unit) < self.visible_x[1]:
             self.visible_x[0] = self.visible_x[0] + self.scroll_unit
             self.visible_x[1] = self.visible_x[1] - self.scroll_unit
+
+            x_displace = x_value - ((self.visible_x[0] + self.visible_x[1]) / 2)
+            if x_displace > 0:
+                x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
+            else:
+                x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
+            self.visible_x[0] += x_displace
+            self.visible_x[1] += x_displace
+
             data = self.updateData()
             self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomOut(self, x_value, y_value):
-        print(x_value, y_value, 'zoom-out')
-        self.visible_x[0] = self.visible_x[0] - self.scroll_unit
-        self.visible_x[1] = self.visible_x[1] + self.scroll_unit
+        print(x_value, y_value, 'zoom-out', self.kd_store.parsed_data.info['domain'][0])
+        # if (self.visible_x[0] - self.scroll_unit) >= self.kd_store.parsed_data.info['domain'][0] and \
+        #         (self.visible_x[1] + self.scroll_unit) <= self.kd_store.parsed_data.info['domain'][1]:
+        t_x = [self.visible_x[0] - self.scroll_unit, self.visible_x[1] + self.scroll_unit]
+
+        x_displace = x_value - ((t_x[0] + t_x[1]) / 2)
+        if x_displace > 0:
+            x_displace = min((self.kd_store.parsed_data.info['domain'][1] - t_x[1]), x_displace)
+        else:
+            x_displace = max((self.kd_store.parsed_data.info['domain'][0] - t_x[0]), x_displace)
+        t_x[0] += x_displace
+        t_x[1] += x_displace
+
+        if t_x[0] >= self.kd_store.parsed_data.info['domain'][0] and t_x[1] <= self.kd_store.parsed_data.info['domain'][1]:
+            self.visible_x[0] = t_x[0]
+            self.visible_x[1] = t_x[1]
+
         data = self.updateData()
         self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def updateData(self):
         self.number_of_locations = len(self.kd_store.parsed_data.info['locationNames'])
-        self.bar_height = (self.ylim / self.number_of_locations) - (2*self.location_gap)
-        self.location_distance = self.bar_height + (2*self.location_gap)
+        self.bar_height = (self.ylim / self.number_of_locations) - (2 * self.location_gap)
+        self.location_distance = self.bar_height + (2 * self.location_gap)
+        begin_time = datetime.now().timestamp() * 1000
         data = self.kd_store.queryInRange(0, self.number_of_locations - 1, self.visible_x[0], self.visible_x[1], self.figure_width)
+        time_taken = (datetime.now().timestamp() * 1000) - begin_time
+        print("data fetch time taken", time_taken, "ms")
         return data
 
     def initiate_gantt_draw(self):
-        px = 1/plt.rcParams['figure.dpi']  # pixel in inches
-        self.figure_width = 1500  # in pixel
-        self.figure_height = 600  # in pixel
-
+        px = 1 / plt.rcParams['figure.dpi']  # pixel in inches
         fig, gnt = plt.subplots(figsize=(self.figure_width * px, self.figure_height * px))
         # fig.set_size_inches(12, 6)
         fig.canvas.callbacks.connect('scroll_event', self.mouse_scrolled)
         fig.canvas.callbacks.connect('button_press_event', self.mouse_clicked)
         fig.canvas.callbacks.connect('button_release_event', self.mouse_released)
+        fig.canvas.callbacks.connect('motion_notify_event', self.mouse_moved)
 
         gnt.set_xlabel('Time (nanoseconds)')
         gnt.set_ylabel('Thread Location')
         gnt.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
         self.kd_store = KDStore()
-        self.visible_x = self.kd_store.parsed_data.info['domain']
+        self.visible_x = copy.deepcopy(self.kd_store.parsed_data.info['domain'])
 
         data = self.updateData()
         gnt.grid(True)
@@ -90,6 +123,7 @@ class Visualize:
         return fig
 
     def update_gantt(self, data, location_names):
+        begin_time = datetime.now().timestamp() * 1000
         def construct_location_name(d):
             a = int(d)
             c = 32
@@ -100,7 +134,7 @@ class Visualize:
             aggText += str(thread)
             return aggText
 
-        y_ticks = list(np.arange(self.location_gap + (self.bar_height/2), self.ylim, self.location_distance))
+        y_ticks = list(np.arange(self.location_gap + (self.bar_height / 2), self.ylim, self.location_distance))
         y_labels = [construct_location_name(location_names[i]) for i in range(self.number_of_locations)]
         self.gantt.set_yticks(y_ticks)
         self.gantt.set_yticklabels(y_labels)
@@ -109,11 +143,14 @@ class Visualize:
         self.gantt.set_xlim(self.visible_x[0], self.visible_x[1])
 
         def get_bar_position(par, loc):
-            return (loc * (par.bar_height + (2*par.location_gap))) + par.location_gap
+            return (loc * (par.bar_height + (2 * par.location_gap))) + par.location_gap
+
         color = 'tab:blue'
         for i in range(self.number_of_locations):
             self.gantt.broken_barh(data[i], (get_bar_position(self, i), self.bar_height), facecolors=color)
         self.gantt.figure.canvas.draw()
+        time_taken = (datetime.now().timestamp() * 1000) - begin_time
+        print("drawing time taken", time_taken, "ms")
 
     def mouse_scrolled(self, event):
         if event.inaxes is not None and event.button == 'up':
@@ -125,15 +162,37 @@ class Visualize:
 
     def mouse_clicked(self, event):
         if event.inaxes is not None:
-            print(event.xdata, event.ydata)
+            self.clicked_point = [event.xdata, event.ydata]
+            print(event.xdata, event.ydata, 'in clicked')
         else:
             print('Clicked outside axes bounds but inside plot window')
 
     def mouse_released(self, event):
         if event.inaxes is not None:
-            print(event.xdata, event.ydata)
+            print(event.xdata, event.ydata, 'in released')
+            if self.clicked_point and self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
+                print("mouse moved")
+            else:
+                print("clicked in single place")
+            self.clicked_point = None
         else:
             print('Released outside axes bounds but inside plot window')
+
+    def mouse_moved(self, event):
+        if self.clicked_point:
+            print(event.xdata, event.ydata, 'mouse moved')
+            if self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
+                self.handlePanning(event.xdata, event.ydata)
+                self.clicked_point = [event.xdata, event.ydata]
+        # if event.inaxes is not None:
+        #     print(event.xdata, event.ydata, 'in released')
+        #     if self.clicked_point and self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
+        #         print("mouse moved")
+        #     else:
+        #         print("clicked in single place")
+        #     self.clicked_point = None
+        # else:
+        #     print('Released outside axes bounds but inside plot window')
 
 
 if __name__ == "__main__":
@@ -161,4 +220,5 @@ if __name__ == "__main__":
 
     plot_widget.grid(row=0, column=0)
     # tk.Button(root,text="Update",command=update).grid(row=1, column=0)
+    # anim = animation.FuncAnimation(fig, vis.updateData(), frames=200, interval=20, blit=True)
     root.mainloop()
