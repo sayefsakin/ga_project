@@ -3,7 +3,6 @@ import math
 import re
 import subprocess
 import sys
-
 from data_parser import DataParser
 
 
@@ -132,12 +131,16 @@ def processOtf2(file):
 
 
 if __name__ == "__main__":
-    print('hello')
-    # path = 'data/cannon/OTF2_archive/APEX.otf2'
-    # processOtf2(FakeFile(path))
+    path = 'data/cannon/OTF2_archive/APEX.otf2'
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
 
-    kd_store = KDStore()
-    print('hello')
+    print('parsing OTF2 file in data directory', path)
+
+    processOtf2(FakeFile(path))
+
+    # kd_store = KDStore()
+    # print('hello')
 
 
 

@@ -43,19 +43,19 @@ class Visualize:
     def handlePanning(self, x_value, y_value):
         if self.clicked_point is not None:
             x_displace = self.clicked_point[0] - x_value
-            print(x_displace, x_value, self.clicked_point[0])
+            # print(x_displace, x_value, self.clicked_point[0])
             if x_displace > 0:
                 x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
             else:
                 x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
             self.visible_x[0] += x_displace
             self.visible_x[1] += x_displace
-            print('visible x', self.visible_x)
+            # print('visible x', self.visible_x)
             data = self.updateData()
             self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomIn(self, x_value, y_value):
-        print(x_value, y_value, 'zoom-in')
+        # print(x_value, y_value, 'zoom-in')
         # dont do the vertical zoom now
         if self.visible_x[0] + (2 * self.scroll_unit) < self.visible_x[1]:
             self.visible_x[0] = self.visible_x[0] + self.scroll_unit
@@ -73,7 +73,7 @@ class Visualize:
             self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomOut(self, x_value, y_value):
-        print(x_value, y_value, 'zoom-out', self.kd_store.parsed_data.info['domain'][0])
+        # print(x_value, y_value, 'zoom-out', self.kd_store.parsed_data.info['domain'][0])
         # if (self.visible_x[0] - self.scroll_unit) >= self.kd_store.parsed_data.info['domain'][0] and \
         #         (self.visible_x[1] + self.scroll_unit) <= self.kd_store.parsed_data.info['domain'][1]:
         t_x = [self.visible_x[0] - self.scroll_unit, self.visible_x[1] + self.scroll_unit]
@@ -171,24 +171,24 @@ class Visualize:
     def mouse_clicked(self, event):
         if event.inaxes is not None:
             self.clicked_point = [event.xdata, event.ydata]
-            print(event.xdata, event.ydata, 'in clicked')
+            # print(event.xdata, event.ydata, 'in clicked')
         else:
             print('Clicked outside axes bounds but inside plot window')
 
     def mouse_released(self, event):
         if event.inaxes is not None:
-            print(event.xdata, event.ydata, 'in released')
-            if self.clicked_point and self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
-                print("mouse moved")
-            else:
-                print("clicked in single place")
+            # print(event.xdata, event.ydata, 'in released')
+            # if self.clicked_point and self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
+            #     print("mouse moved")
+            # else:
+            #     print("clicked in single place")
             self.clicked_point = None
         else:
             print('Released outside axes bounds but inside plot window')
 
     def mouse_moved(self, event):
         if self.clicked_point is not None:
-            print(event.xdata, event.ydata, 'mouse moved')
+            # print(event.xdata, event.ydata, 'mouse moved')
             if self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
                 self.handlePanning(event.xdata, event.ydata)
                 self.clicked_point = [event.xdata, event.ydata]
