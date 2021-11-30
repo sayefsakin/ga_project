@@ -1,12 +1,15 @@
 import copy
+import io
 
+import PIL
 import numpy as np
-import tkinter as tk
+from tkinter import *
 import random
 import matplotlib
 from matplotlib import ticker, animation
 from datetime import datetime
 from data_store import KDStore
+from PIL import Image, ImageTk
 
 matplotlib.use('TkAgg')
 
@@ -33,21 +36,23 @@ class Visualize:
         self.gantt = None
         self.scroll_unit = 30000000
         self.kd_store = None
-        self.figure_width = 800  # in pixel
+        self.figure_width = 1000  # in pixel
         self.figure_height = 400  # in pixel
         self.clicked_point = None
 
     def handlePanning(self, x_value, y_value):
-        x_displace = x_value - ((self.visible_x[0] + self.visible_x[1]) / 2)
-        if x_displace > 0:
-            x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
-        else:
-            x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
-        self.visible_x[0] += x_displace
-        self.visible_x[1] += x_displace
-
-        data = self.updateData()
-        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
+        if self.clicked_point is not None:
+            x_displace = self.clicked_point[0] - x_value
+            print(x_displace, x_value, self.clicked_point[0])
+            if x_displace > 0:
+                x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
+            else:
+                x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
+            self.visible_x[0] += x_displace
+            self.visible_x[1] += x_displace
+            print('visible x', self.visible_x)
+            data = self.updateData()
+            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomIn(self, x_value, y_value):
         print(x_value, y_value, 'zoom-in')
@@ -107,15 +112,12 @@ class Visualize:
         fig.canvas.callbacks.connect('button_release_event', self.mouse_released)
         fig.canvas.callbacks.connect('motion_notify_event', self.mouse_moved)
 
-        gnt.set_xlabel('Time (nanoseconds)')
-        gnt.set_ylabel('Thread Location')
-        gnt.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+
 
         self.kd_store = KDStore()
         self.visible_x = copy.deepcopy(self.kd_store.parsed_data.info['domain'])
 
         data = self.updateData()
-        gnt.grid(True)
         # for i in range(self.number_of_locations):
         #     self.data[i] = generateRandomTasks(self.xlim)
         self.gantt = gnt
@@ -133,6 +135,11 @@ class Visualize:
             aggText += str(node) + ' - T'
             aggText += str(thread)
             return aggText
+        self.gantt.clear()
+        self.gantt.grid(True)
+        self.gantt.set_xlabel('Time (nanoseconds)')
+        self.gantt.set_ylabel('Thread Location')
+        self.gantt.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
         y_ticks = list(np.arange(self.location_gap + (self.bar_height / 2), self.ylim, self.location_distance))
         y_labels = [construct_location_name(location_names[i]) for i in range(self.number_of_locations)]
@@ -146,6 +153,7 @@ class Visualize:
             return (loc * (par.bar_height + (2 * par.location_gap))) + par.location_gap
 
         color = 'tab:blue'
+
         for i in range(self.number_of_locations):
             self.gantt.broken_barh(data[i], (get_bar_position(self, i), self.bar_height), facecolors=color)
         self.gantt.figure.canvas.draw()
@@ -179,7 +187,7 @@ class Visualize:
             print('Released outside axes bounds but inside plot window')
 
     def mouse_moved(self, event):
-        if self.clicked_point:
+        if self.clicked_point is not None:
             print(event.xdata, event.ydata, 'mouse moved')
             if self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
                 self.handlePanning(event.xdata, event.ydata)
@@ -194,9 +202,16 @@ class Visualize:
         # else:
         #     print('Released outside axes bounds but inside plot window')
 
+def fig2img(fig):
+    return PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+    # buf = io.BytesIO()
+    # fig.savefig(buf)
+    # buf.seek(0)
+    # img = Image.open(buf)
+    # return img
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = Tk()
     root.title("Gantt")
     # YSIZE = 800
     # root.geometry(str(YSIZE)+'x'+str(YSIZE)) #("800x800")
@@ -212,13 +227,23 @@ if __name__ == "__main__":
     canvas = FigureCanvasTkAgg(fig, master=root)
     plot_widget = canvas.get_tk_widget()
 
-    # def update():
-    #     s = np.cos(np.pi*t)
-    #     plt.plot(t,s)
-    #     #d[0].set_ydata(s)
-    #     fig.canvas.draw()
 
     plot_widget.grid(row=0, column=0)
     # tk.Button(root,text="Update",command=update).grid(row=1, column=0)
-    # anim = animation.FuncAnimation(fig, vis.updateData(), frames=200, interval=20, blit=True)
+    # img = fig2img(fig)
+
+    # img.show()
+
+    # #Set the geometry
+    # root.geometry("800x400")
+    # #Convert To photoimage
+    # tkimage= ImageTk.PhotoImage(img)
+    # #Create a canvas
+    # canvas = Canvas(root, width=vis.figure_width, height=vis.figure_height)
+    # canvas.create_image(0, 0, anchor=NW, image=tkimage)
+    # canvas.pack()
+
+
+
+
     root.mainloop()
