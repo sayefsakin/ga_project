@@ -15,7 +15,7 @@ class KDNode:
         self.right = rt
 
     def getTimeWindow(self):
-        return self.location[1] - self.location[0]
+        return self.timestamp[1] - self.timestamp[0]
 
     def isLeaf(self):
         return self.left is None and self.right is None
@@ -90,7 +90,7 @@ class KDStore:
         pixel_window = (en_time - st_time) / figure_width
 
         def searchInKDTree(kd_node, sl_index, el_index, st, et):
-            if kd_node.getTimeWindow() == pixel_window:
+            if kd_node.getTimeWindow() <= pixel_window:
                 if kd_node.isLeaf() is False:
                     for loc in range(kd_node.location[0], kd_node.location[1] + 1):
                         data[loc].append((kd_node.timestamp[0], 1))

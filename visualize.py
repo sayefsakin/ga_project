@@ -29,6 +29,10 @@ class Visualize:
         self.visible_x = [0, self.xlim]
         self.visible_y = [0, self.ylim]
         self.gantt = None
+        self.scroll_unit = 100000000
+        self.kd_store = None
+        self.figure_width = 0
+        self.figure_height = 0
 
     def handlePanningLeft(self):
         pass
@@ -36,26 +40,35 @@ class Visualize:
     def handlePanningRight(self):
         pass
 
-    def handleZoomIn(self):
-        pass
+    def handleZoomIn(self, x_value, y_value):
+        print(x_value, y_value, 'zoom-in')
+        # dont do the vertical zoom now
+        if self.visible_x[0] + (2 * self.scroll_unit) < self.visible_x[1]:
+            self.visible_x[0] = self.visible_x[0] + self.scroll_unit
+            self.visible_x[1] = self.visible_x[1] - self.scroll_unit
+            data = self.updateData()
+            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
-    def handleZoomOut(self):
-        pass
+    def handleZoomOut(self, x_value, y_value):
+        print(x_value, y_value, 'zoom-out')
+        self.visible_x[0] = self.visible_x[0] - self.scroll_unit
+        self.visible_x[1] = self.visible_x[1] + self.scroll_unit
+        data = self.updateData()
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
-    def updateData(self, kd_store, figure_width):
-        self.number_of_locations = len(kd_store.parsed_data.info['locationNames'])
+    def updateData(self):
+        self.number_of_locations = len(self.kd_store.parsed_data.info['locationNames'])
         self.bar_height = (self.ylim / self.number_of_locations) - (2*self.location_gap)
         self.location_distance = self.bar_height + (2*self.location_gap)
-        self.visible_x = kd_store.parsed_data.info['domain']
-        data = kd_store.queryInRange(0, self.number_of_locations - 1, self.visible_x[0], self.visible_x[1], figure_width)
+        data = self.kd_store.queryInRange(0, self.number_of_locations - 1, self.visible_x[0], self.visible_x[1], self.figure_width)
         return data
 
     def initiate_gantt_draw(self):
         px = 1/plt.rcParams['figure.dpi']  # pixel in inches
-        figure_width = 1500 * px  # in pixel
-        figure_height = 600 * px  # in pixel
+        self.figure_width = 1500  # in pixel
+        self.figure_height = 600  # in pixel
 
-        fig, gnt = plt.subplots(figsize=(figure_width, figure_height))
+        fig, gnt = plt.subplots(figsize=(self.figure_width * px, self.figure_height * px))
         # fig.set_size_inches(12, 6)
         fig.canvas.callbacks.connect('scroll_event', self.mouse_scrolled)
         fig.canvas.callbacks.connect('button_press_event', self.mouse_clicked)
@@ -65,13 +78,15 @@ class Visualize:
         gnt.set_ylabel('Thread Location')
         gnt.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
-        kd_store = KDStore()
-        data = self.updateData(kd_store, figure_width)
+        self.kd_store = KDStore()
+        self.visible_x = self.kd_store.parsed_data.info['domain']
+
+        data = self.updateData()
         gnt.grid(True)
         # for i in range(self.number_of_locations):
         #     self.data[i] = generateRandomTasks(self.xlim)
         self.gantt = gnt
-        self.update_gantt(data, kd_store.parsed_data.info['locationNames'])
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
         return fig
 
     def update_gantt(self, data, location_names):
@@ -101,17 +116,10 @@ class Visualize:
         self.gantt.figure.canvas.draw()
 
     def mouse_scrolled(self, event):
-        scroll_unit = 1
-        if event.button == 'up':
-            # print(event.xdata, event.ydata)
-            if self.visible_x[0] + (2 * scroll_unit) < self.visible_x[1]:
-                self.visible_x[0] = self.visible_x[0] + scroll_unit
-                self.visible_x[1] = self.visible_x[1] - scroll_unit
-                self.update_gantt()
-        elif event.button == 'down':
-            self.visible_x[0] = self.visible_x[0] - scroll_unit
-            self.visible_x[1] = self.visible_x[1] + scroll_unit
-            self.update_gantt()
+        if event.inaxes is not None and event.button == 'up':
+            self.handleZoomIn(event.xdata, event.ydata)
+        elif event.inaxes is not None and event.button == 'down':
+            self.handleZoomOut(event.xdata, event.ydata)
         else:
             print('Scrolled outside axes bounds but inside plot window')
 
