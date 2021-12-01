@@ -42,6 +42,8 @@ class Visualize:
         self.clicked_point = None
         self.canvas = Canvas(self.root, width=self.figure_width, height=self.figure_height)
         self.canvas.grid(row=0, column=0)
+        self.first_image = None
+        self.original_image_object = None
 
     def handlePanning(self, x_value, y_value):
         if self.clicked_point is not None:
@@ -58,7 +60,7 @@ class Visualize:
             self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomIn(self, x_value, y_value):
-        # print(x_value, y_value, 'zoom-in')
+        print(x_value, y_value, 'zoom-in')
         # dont do the vertical zoom now
         if self.visible_x[0] + (2 * self.scroll_unit) < self.visible_x[1]:
             self.visible_x[0] = self.visible_x[0] + self.scroll_unit
@@ -73,7 +75,7 @@ class Visualize:
             self.visible_x[1] += x_displace
 
             data = self.updateData()
-            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
+            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], True)
 
     def handleZoomOut(self, x_value, y_value):
         # print(x_value, y_value, 'zoom-out', self.kd_store.parsed_data.info['domain'][0])
@@ -124,10 +126,10 @@ class Visualize:
         # for i in range(self.number_of_locations):
         #     self.data[i] = generateRandomTasks(self.xlim)
         self.gantt = gnt
-        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], fig)
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
         return fig
 
-    def update_gantt(self, data, location_names, fig):
+    def update_gantt(self, data, location_names, is_click=False):
         begin_time = datetime.now().timestamp() * 1000
         def construct_location_name(d):
             a = int(d)
@@ -162,7 +164,17 @@ class Visualize:
         self.gantt.figure.canvas.draw()
 
 
-
+        if is_click is True:
+            # img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+            idraw = ImageDraw.Draw(self.original_image_object)
+            idraw.rectangle(((100, 100), (200, 200)), fill="blue")
+            # self.original_image_object.show()
+            self.itkimage = ImageTk.PhotoImage(self.original_image_object)
+            self.canvas.itemconfig(self.first_image, image=self.itkimage)
+            # PSIZE = 200
+            # p = [300, 300]
+            # self.canvas.create_oval(p[0] - PSIZE, p[1] - PSIZE, p[0] + PSIZE, p[1] + PSIZE, fill='red', w=2)
+            # self.root.mainloop()
 
         time_taken = (datetime.now().timestamp() * 1000) - begin_time
         print("drawing time taken", time_taken, "ms")
@@ -209,6 +221,11 @@ class Visualize:
         # else:
         #     print('Released outside axes bounds but inside plot window')
 
+    def find_intersections_wrapper(self, clickEvent):
+        print('clicked here')
+        data = self.updateData()
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], True)
+
 def fig2img(fig):
     return PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
     # buf = io.BytesIO()
@@ -216,6 +233,8 @@ def fig2img(fig):
     # buf.seek(0)
     # img = Image.open(buf)
     # return img
+
+
 
 if __name__ == "__main__":
     root = Tk()
@@ -229,7 +248,9 @@ if __name__ == "__main__":
     draw.rectangle(((0, 00), (100, 100)), fill="black")
     # img.show()
     tkimage = ImageTk.PhotoImage(img)
-    vis.canvas.create_image(0, 0, anchor=NW, image=tkimage)
+    vis.original_image_object = img
+    vis.first_image = vis.canvas.create_image(0, 0, anchor=NW, image=tkimage)
+    vis.canvas.bind("<Button-1>", vis.find_intersections_wrapper)
     vis.canvas.pack()
 
 
