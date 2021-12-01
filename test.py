@@ -292,9 +292,9 @@ root.mainloop()
 #         print('on click event happened')
 #         img = PIL.Image.frombytes('RGB', self.gantt.figure.canvas.get_width_height(), self.gantt.figure.canvas.tostring_rgb())
 #
-#         draw = ImageDraw.Draw(img)
-#         draw.rectangle(((0, 00), (100, 100)), fill="black")
-#         # img.show()
+        # draw = ImageDraw.Draw(img)
+        # draw.rectangle(((0, 00), (100, 100)), fill="black")
+        # # img.show()
 #
 #         #Convert To photoimage
 #         tkimage = ImageTk.PhotoImage(img)

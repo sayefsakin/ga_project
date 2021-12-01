@@ -9,7 +9,7 @@ import matplotlib
 from matplotlib import ticker, animation
 from datetime import datetime
 from data_store import KDStore
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 
 matplotlib.use('TkAgg')
 
@@ -24,7 +24,8 @@ def generateRandomTasks(x_max):
 
 class Visualize:
 
-    def __init__(self):
+    def __init__(self, r):
+        self.root = r
         self.number_of_locations = 10
         self.location_gap = 0.5
         self.ylim = 50
@@ -39,6 +40,8 @@ class Visualize:
         self.figure_width = 1000  # in pixel
         self.figure_height = 400  # in pixel
         self.clicked_point = None
+        self.canvas = Canvas(self.root, width=self.figure_width, height=self.figure_height)
+        self.canvas.grid(row=0, column=0)
 
     def handlePanning(self, x_value, y_value):
         if self.clicked_point is not None:
@@ -121,10 +124,10 @@ class Visualize:
         # for i in range(self.number_of_locations):
         #     self.data[i] = generateRandomTasks(self.xlim)
         self.gantt = gnt
-        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], fig)
         return fig
 
-    def update_gantt(self, data, location_names):
+    def update_gantt(self, data, location_names, fig):
         begin_time = datetime.now().timestamp() * 1000
         def construct_location_name(d):
             a = int(d)
@@ -157,6 +160,10 @@ class Visualize:
         for i in range(self.number_of_locations):
             self.gantt.broken_barh(data[i], (get_bar_position(self, i), self.bar_height), facecolors=color)
         self.gantt.figure.canvas.draw()
+
+
+
+
         time_taken = (datetime.now().timestamp() * 1000) - begin_time
         print("drawing time taken", time_taken, "ms")
 
@@ -213,37 +220,17 @@ def fig2img(fig):
 if __name__ == "__main__":
     root = Tk()
     root.title("Gantt")
-    # YSIZE = 800
-    # root.geometry(str(YSIZE)+'x'+str(YSIZE)) #("800x800")
 
-    vis = Visualize()
+    vis = Visualize(root)
     fig = vis.initiate_gantt_draw()
-    # fig = plt.figure(1)
-    # plt.ion()
-    # t = np.arange(0.0,3.0,0.01)
-    # s = np.sin(np.pi*t)
-    # plt.plot(t,s)
 
-    canvas = FigureCanvasTkAgg(fig, master=root)
-    plot_widget = canvas.get_tk_widget()
-
-
-    plot_widget.grid(row=0, column=0)
-    # tk.Button(root,text="Update",command=update).grid(row=1, column=0)
-    # img = fig2img(fig)
-
+    img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+    draw = ImageDraw.Draw(img)
+    draw.rectangle(((0, 00), (100, 100)), fill="black")
     # img.show()
-
-    # #Set the geometry
-    # root.geometry("800x400")
-    # #Convert To photoimage
-    # tkimage= ImageTk.PhotoImage(img)
-    # #Create a canvas
-    # canvas = Canvas(root, width=vis.figure_width, height=vis.figure_height)
-    # canvas.create_image(0, 0, anchor=NW, image=tkimage)
-    # canvas.pack()
-
-
+    tkimage = ImageTk.PhotoImage(img)
+    vis.canvas.create_image(0, 0, anchor=NW, image=tkimage)
+    vis.canvas.pack()
 
 
     root.mainloop()
