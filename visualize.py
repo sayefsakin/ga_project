@@ -2,6 +2,7 @@ import copy
 import io
 import math
 import tkinter
+from tkinter.tix import Balloon
 
 import PIL
 import numpy as np
@@ -59,6 +60,7 @@ class Visualize:
         self.original_image_object = None
         self.inside_figure = None
         self.itkimage = None
+        self.old_text = None
 
     def handlePanning(self, x_value, pre_x):
         x_displace = pre_x - x_value
@@ -190,6 +192,7 @@ class Visualize:
             self.canvas.bind("<MouseWheel>", vis.mouse_scroll_event_wrapper)
             self.canvas.bind("<B1-Motion>", vis.mouse_move_event_wrapper)
             self.canvas.bind("<ButtonRelease-1>", vis.mouse_release_event_wrapper)
+            self.canvas.bind("<Button-1>", vis.mouse_click_event_wrapper)
             self.canvas.pack()
         else:
             self.canvas.itemconfig(self.first_image, image=self.itkimage)
@@ -198,6 +201,8 @@ class Visualize:
         print("drawing time taken", time_taken, "ms")
 
     def mouse_scroll_event_wrapper(self, mouseEvent):
+        if self.old_text:
+            self.canvas.delete(self.old_text)
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
             xdata = scale_point_in_range(mouseEvent.x, self.canvas_x_range, self.visible_x)
             ydata = scale_point_in_range(mouseEvent.y, self.canvas_y_range, self.visible_y)
@@ -209,8 +214,10 @@ class Visualize:
             print('outside chart')
 
     def mouse_move_event_wrapper(self, mouseEvent):
+        if self.old_text:
+            self.canvas.delete(self.old_text)
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
-            print('actual x y', mouseEvent.x, mouseEvent.y)
+            # print('actual x y', mouseEvent.x, mouseEvent.y)
             # print(xdata, ydata, "mouse move")
             if self.clicked_point is not None:
                 if self.clicked_point[0] != mouseEvent.x or self.clicked_point[1] != mouseEvent.y:
@@ -227,6 +234,25 @@ class Visualize:
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
             # print('release x y', mouseEvent.x, mouseEvent.y)
             self.clicked_point = None
+        else:
+            print('outside chart')
+
+    def mouse_click_event_wrapper(self, mouseEvent):
+        if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
+            # print('click x y', mouseEvent.x, mouseEvent.y)
+
+            def get_location_from_ydata(par, y_pos):
+                return int((y_pos - par.canvas_location_gap - par.canvas_y_range[0]) / (par.canvas_bar_height + (2 * par.canvas_location_gap)))
+            xdata = scale_point_in_range(mouseEvent.x, self.canvas_x_range, self.visible_x)
+            loc_index = get_location_from_ydata(self, mouseEvent.y)
+            loc = self.kd_store.parsed_data.info['locationNames'][loc_index]
+            st_index = self.kd_store.parsed_data.sortedEventsByLocation[loc].bisect((xdata,))
+            if self.old_text:
+                self.canvas.delete(self.old_text)
+            if self.kd_store.parsed_data.sortedEventsByLocation[loc][st_index-1][1]['Timestamp'] < xdata < self.kd_store.parsed_data.sortedEventsByLocation[loc][st_index][1]['Timestamp']\
+                    and self.kd_store.parsed_data.sortedEventsByLocation[loc][st_index-1][1]['Event'] == 'ENTER':
+                self.old_text = self.canvas.create_text(mouseEvent.x, mouseEvent.y, fill="black", font="Times 12",
+                                                        text=self.kd_store.parsed_data.sortedEventsByLocation[loc][st_index][1]['Primitive'])
         else:
             print('outside chart')
 
