@@ -62,9 +62,35 @@ class KDStore:
             if st is None or en is None:
                 return None
             if st + 1 == en:  # this belongs to a single interval
-                st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
-                en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
-                return KDNode(start_loc_index, end_loc_index, st_time, en_time)
+                if self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Event'] == 'ENTER'\
+                        and self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Event'] == 'ENTER':
+                    last_time = en_time
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                    left = KDNode(start_loc_index, end_loc_index, st_time, en_time - 1)
+                    right = KDNode(start_loc_index, end_loc_index, en_time, last_time)
+                    return KDNode(start_loc_index, end_loc_index, st_time, last_time, left, right)
+                elif self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Event'] == 'LEAVE' \
+                        and self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Event'] == 'LEAVE':
+                    f_time = st_time
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                    left = KDNode(start_loc_index, end_loc_index, f_time, st_time)
+                    right = KDNode(start_loc_index, end_loc_index, st_time + 1, en_time)
+                    return KDNode(start_loc_index, end_loc_index, f_time, en_time, left, right)
+                elif self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Event'] == 'LEAVE' \
+                        and self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Event'] == 'ENTER':
+                    last_time = en_time
+                    f_time = st_time
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                    left = KDNode(start_loc_index, end_loc_index, f_time, st_time)
+                    right = KDNode(start_loc_index, end_loc_index, en_time, last_time)
+                    return KDNode(start_loc_index, end_loc_index, f_time, last_time, left, right)
+                else:
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                    return KDNode(start_loc_index, end_loc_index, st_time, en_time)
             elif en <= st:
                 return None
         if (depth % 2) == 0:  # vertical
