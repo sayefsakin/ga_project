@@ -60,19 +60,17 @@ class Visualize:
         self.inside_figure = None
         self.itkimage = None
 
-    def handlePanning(self, x_value, y_value):
-        if self.clicked_point is not None:
-            x_displace = self.clicked_point[0] - x_value
-            # print(x_displace, x_value, self.clicked_point[0])
-            if x_displace > 0:
-                x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
-            else:
-                x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
-            self.visible_x[0] += x_displace
-            self.visible_x[1] += x_displace
-            # print('visible x', self.visible_x)
-            data = self.updateData()
-            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
+    def handlePanning(self, x_value, pre_x):
+        x_displace = pre_x - x_value
+        if x_displace > 0:
+            x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
+        else:
+            x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
+        self.visible_x[0] += x_displace
+        self.visible_x[1] += x_displace
+        # print('visible x', self.visible_x)
+        data = self.updateData()
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomIn(self, x_value, y_value):
         print(x_value, y_value, 'zoom-in')
@@ -110,11 +108,6 @@ class Visualize:
     def initiate_gantt_draw(self):
         px = 1 / plt.rcParams['figure.dpi']  # pixel in inches
         fig, gnt = plt.subplots(figsize=(self.figure_width * px, self.figure_height * px))
-        # fig.set_size_inches(12, 6)
-        fig.canvas.callbacks.connect('scroll_event', self.mouse_scrolled)
-        fig.canvas.callbacks.connect('button_press_event', self.mouse_clicked)
-        fig.canvas.callbacks.connect('button_release_event', self.mouse_released)
-        fig.canvas.callbacks.connect('motion_notify_event', self.mouse_moved)
 
         self.kd_store = KDStore()
         self.visible_x = copy.deepcopy(self.kd_store.parsed_data.info['domain'])
@@ -195,54 +188,14 @@ class Visualize:
         if self.first_image is None:
             self.first_image = vis.canvas.create_image(0, 0, anchor=NW, image=self.itkimage)
             self.canvas.bind("<MouseWheel>", vis.mouse_scroll_event_wrapper)
+            self.canvas.bind("<B1-Motion>", vis.mouse_move_event_wrapper)
+            self.canvas.bind("<ButtonRelease-1>", vis.mouse_release_event_wrapper)
             self.canvas.pack()
         else:
             self.canvas.itemconfig(self.first_image, image=self.itkimage)
 
         time_taken = (datetime.now().timestamp() * 1000) - begin_time
         print("drawing time taken", time_taken, "ms")
-
-    def mouse_scrolled(self, event):
-        if event.inaxes is not None and event.button == 'up':
-            self.handleZoomIn(event.xdata, event.ydata)
-        elif event.inaxes is not None and event.button == 'down':
-            self.handleZoomOut(event.xdata, event.ydata)
-        else:
-            print('Scrolled outside axes bounds but inside plot window')
-
-    def mouse_clicked(self, event):
-        if event.inaxes is not None:
-            self.clicked_point = [event.xdata, event.ydata]
-            # print(event.xdata, event.ydata, 'in clicked')
-        else:
-            print('Clicked outside axes bounds but inside plot window')
-
-    def mouse_released(self, event):
-        if event.inaxes is not None:
-            # print(event.xdata, event.ydata, 'in released')
-            # if self.clicked_point and self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
-            #     print("mouse moved")
-            # else:
-            #     print("clicked in single place")
-            self.clicked_point = None
-        else:
-            print('Released outside axes bounds but inside plot window')
-
-    def mouse_moved(self, event):
-        if self.clicked_point is not None:
-            # print(event.xdata, event.ydata, 'mouse moved')
-            if self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
-                self.handlePanning(event.xdata, event.ydata)
-                self.clicked_point = [event.xdata, event.ydata]
-        # if event.inaxes is not None:
-        #     print(event.xdata, event.ydata, 'in released')
-        #     if self.clicked_point and self.clicked_point[0] != event.xdata and self.clicked_point[1] != event.ydata:
-        #         print("mouse moved")
-        #     else:
-        #         print("clicked in single place")
-        #     self.clicked_point = None
-        # else:
-        #     print('Released outside axes bounds but inside plot window')
 
     def mouse_scroll_event_wrapper(self, mouseEvent):
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
@@ -252,21 +205,30 @@ class Visualize:
                 self.handleZoomIn(xdata, ydata)
             else:  # scroll down
                 self.handleZoomOut(xdata, ydata)
-            # data = self.updateData()
-            # self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], True)
         else:
             print('outside chart')
 
+    def mouse_move_event_wrapper(self, mouseEvent):
+        if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
+            print('actual x y', mouseEvent.x, mouseEvent.y)
+            # print(xdata, ydata, "mouse move")
+            if self.clicked_point is not None:
+                if self.clicked_point[0] != mouseEvent.x or self.clicked_point[1] != mouseEvent.y:
+                    xdata = scale_point_in_range(mouseEvent.x, self.canvas_x_range, self.visible_x)
+                    ydata = scale_point_in_range(mouseEvent.y, self.canvas_y_range, self.visible_y)
+                    pre_x = scale_point_in_range(self.clicked_point[0], self.canvas_x_range, self.visible_x)
+                    self.handlePanning(xdata, pre_x)
+                    print('trigger panning from ', self.clicked_point, xdata, ydata)
+            self.clicked_point = [mouseEvent.x, mouseEvent.y]
+        else:
+            print('outside chart')
 
-def fig2img(fig):
-    return PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-    # buf = io.BytesIO()
-    # fig.savefig(buf)
-    # buf.seek(0)
-    # img = Image.open(buf)
-    # return img
-
-
+    def mouse_release_event_wrapper(self, mouseEvent):
+        if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
+            # print('release x y', mouseEvent.x, mouseEvent.y)
+            self.clicked_point = None
+        else:
+            print('outside chart')
 
 if __name__ == "__main__":
     root = Tk()
