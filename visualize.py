@@ -23,7 +23,12 @@ def generateRandomTasks(x_max):
     return [(random.randint(0, x_max), random.randint(10, 30)) for _ in range(n)]
 
 def scale_point_in_range(val, src, dst):
-    return ((val - src[0]) / (src[1]-src[0])) * (dst[1]-dst[0]) + dst[0]
+    ret = ((val - src[0]) / (src[1]-src[0])) * (dst[1]-dst[0]) + dst[0]
+    if ret < dst[0]:
+        ret = dst[0]
+    if ret > dst[1]:
+        ret = dst[1]
+    return ret
 
 class Visualize:
 
@@ -195,9 +200,7 @@ class Visualize:
         for i in range(self.number_of_locations):
             for bar in data[i]:
                 idraw.rectangle(((scale_point_in_range(bar[0], self.visible_x, self.canvas_x_range), get_bar_y_position(self, i)),
-                                 (scale_point_in_range(bar[0], self.visible_x, self.canvas_x_range) + scale_length_in_x(bar[1],
-                                                                                                                             self.visible_x,
-                                                                                                                             self.canvas_x_range),
+                                 (scale_point_in_range(bar[1], self.visible_x, self.canvas_x_range),
                                   get_bar_y_position(self, i) + self.canvas_bar_height)),
                                 fill="blue")
         # for i in range(1000):
