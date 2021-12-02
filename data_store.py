@@ -37,11 +37,11 @@ class KDStore:
         st_index = self.parsed_data.sortedEventsByLocation[location].bisect((st_time,))
         en_index = self.parsed_data.sortedEventsByLocation[location].bisect((en_time,))
         if st_index == len(self.parsed_data.sortedEventsByLocation[location]):
-            st_index = None
+            st_index -= 1  # st_index = None
         elif self.parsed_data.sortedEventsByLocation[location][st_index][1]['Event'] == 'LEAVE':
             st_index -= 1
         if en_index == len(self.parsed_data.sortedEventsByLocation[location]):
-            en_index = None
+            en_index -= 1  # en_index = None
         elif self.parsed_data.sortedEventsByLocation[location][en_index][1]['Event'] == 'ENTER':  # remove the trailing enter event
             en_index -= 1
         return (st_index, en_index)
@@ -54,12 +54,20 @@ class KDStore:
 
     def insertIntoKDTree(self, start_loc_index, end_loc_index, st_time, en_time, depth):
         if start_loc_index > end_loc_index:
+            print('==== start loc is greater than en loc')
             return None
         start_loc = self.parsed_data.info['locationNames'][start_loc_index]
         end_loc = self.parsed_data.info['locationNames'][end_loc_index]
         if start_loc == end_loc:
             st, en = self.findIntervalsInLocation(start_loc, st_time, en_time)
             if st is None or en is None:
+                if st is not None:
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    return KDNode(start_loc_index, end_loc_index, st_time, en_time)
+                if en is not None:
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                    return KDNode(start_loc_index, end_loc_index, st_time, en_time)
+                print('==== both st en is None')
                 return None
             if st + 1 == en:  # this belongs to a single interval
                 if self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Event'] == 'ENTER'\
@@ -91,21 +99,34 @@ class KDStore:
                     st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
                     en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
                     return KDNode(start_loc_index, end_loc_index, st_time, en_time)
-            elif en <= st:
-                return None
+            elif en == st:
+                if self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Event'] == 'LEAVE':
+                    en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                    return KDNode(start_loc_index, end_loc_index, st_time, en_time)
+                else:
+                    st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                    return KDNode(start_loc_index, end_loc_index, st_time, en_time)
+            elif en < st:
+                st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
+                return KDNode(start_loc_index, end_loc_index, st_time, en_time)
         if (depth % 2) == 0:  # vertical
             if start_loc == end_loc:
                 st, en = self.findIntervalsInLocation(start_loc, st_time, en_time)
                 if st is not None and en is not None:
                     st_time = max(self.parsed_data.sortedEventsByLocation[start_loc][st][1]['Timestamp'], st_time)
                     en_time = min(self.parsed_data.sortedEventsByLocation[start_loc][en][1]['Timestamp'], en_time)
+                else:
+                    print('either of st en is None')
             mid = math.floor((st_time + en_time) / 2)
             left = self.insertIntoKDTree(start_loc_index, end_loc_index, st_time, mid, depth + 1)
             right = self.insertIntoKDTree(start_loc_index, end_loc_index, mid+1, en_time, depth + 1)
         else:
             mid = math.floor((start_loc_index + end_loc_index) / 2)
             left = self.insertIntoKDTree(start_loc_index, mid, st_time, en_time, depth + 1)
-            right = self.insertIntoKDTree(mid+1, end_loc_index, st_time, en_time, depth + 1)
+            if mid+1 <= end_loc_index:
+                right = self.insertIntoKDTree(mid+1, end_loc_index, st_time, en_time, depth + 1)
+            else:
+                right = None
         return KDNode(start_loc_index, end_loc_index, st_time, en_time, left, right)
 
     def queryInRange(self, start_loc_index, end_loc_index, st_time, en_time, figure_width):
@@ -117,13 +138,12 @@ class KDStore:
         def searchInKDTree(kd_node, sl_index, el_index, st, et):
             if kd_node.getTimeWindow() <= pixel_window:
                 if kd_node.isLeaf() is False:
-                    if (kd_node.timestamp[1] - kd_node.timestamp[0]) / (et - st) > 0.5:
-                        for loc in range(kd_node.location[0], kd_node.location[1] + 1):
-                            data[loc].append((kd_node.timestamp[0], kd_node.timestamp[0]+1))
+                    for loc in range(kd_node.location[0], kd_node.location[1] + 1):
+                        data[loc].append((kd_node.timestamp[0], kd_node.timestamp[1], (120, 107, 255, 255)))
                 return
             if kd_node.isLeaf():
                 for loc in range(kd_node.location[0], kd_node.location[1] + 1):
-                    data[loc].append((kd_node.timestamp[0], kd_node.timestamp[1]))
+                    data[loc].append((kd_node.timestamp[0], kd_node.timestamp[1], (33, 12, 250, 255)))
                 return
             if kd_node.left and kd_node.left.isOverlap(sl_index, el_index, st, et):
                 searchInKDTree(kd_node.left, sl_index, el_index, st, et)

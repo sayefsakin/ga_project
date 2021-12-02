@@ -178,7 +178,7 @@ class Visualize:
                 idraw.rectangle(((scale_point_in_range(bar[0], self.visible_x, self.canvas_x_range), get_bar_y_position(self, i)),
                                  (scale_point_in_range(bar[1], self.visible_x, self.canvas_x_range),
                                   get_bar_y_position(self, i) + self.canvas_bar_height)),
-                                fill="blue")
+                                fill=bar[2])
         # for i in range(1000):
         # idraw.rectangle(((200, 200), (300, 300)), fill="blue")
         # img.show()
