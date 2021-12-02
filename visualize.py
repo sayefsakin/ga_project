@@ -1,5 +1,6 @@
 import copy
 import io
+import tkinter
 
 import PIL
 import numpy as np
@@ -21,6 +22,8 @@ def generateRandomTasks(x_max):
     n = random.randint(5, 20)
     return [(random.randint(0, x_max), random.randint(10, 30)) for _ in range(n)]
 
+def scale_point_in_range(val, src, dst):
+    return ((val - src[0]) / (src[1]-src[0])) * (dst[1]-dst[0]) + dst[0]
 
 class Visualize:
 
@@ -28,9 +31,13 @@ class Visualize:
         self.root = r
         self.number_of_locations = 10
         self.location_gap = 0.5
+        self.canvas_location_gap = 1
         self.ylim = 50
         self.xlim = 260
+        self.canvas_x_range = [126, 900]
+        self.canvas_y_range = [48, 355]
         self.bar_height = (self.ylim / self.number_of_locations) - (2 * self.location_gap)
+        self.canvas_bar_height = 0
         self.location_distance = self.bar_height + (2 * self.location_gap)
         self.visible_x = [0, self.xlim]
         self.visible_y = [0, self.ylim]
@@ -44,6 +51,8 @@ class Visualize:
         self.canvas.grid(row=0, column=0)
         self.first_image = None
         self.original_image_object = None
+        self.inside_figure = None
+        self.itkimage = None
 
     def handlePanning(self, x_value, y_value):
         if self.clicked_point is not None:
@@ -75,7 +84,7 @@ class Visualize:
             self.visible_x[1] += x_displace
 
             data = self.updateData()
-            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], True)
+            self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomOut(self, x_value, y_value):
         # print(x_value, y_value, 'zoom-out', self.kd_store.parsed_data.info['domain'][0])
@@ -101,6 +110,7 @@ class Visualize:
     def updateData(self):
         self.number_of_locations = len(self.kd_store.parsed_data.info['locationNames'])
         self.bar_height = (self.ylim / self.number_of_locations) - (2 * self.location_gap)
+        self.canvas_bar_height = ((self.canvas_y_range[1] - self.canvas_y_range[0]) / self.number_of_locations) - (2 * self.canvas_location_gap)
         self.location_distance = self.bar_height + (2 * self.location_gap)
         begin_time = datetime.now().timestamp() * 1000
         data = self.kd_store.queryInRange(0, self.number_of_locations - 1, self.visible_x[0], self.visible_x[1], self.figure_width)
@@ -126,10 +136,16 @@ class Visualize:
         # for i in range(self.number_of_locations):
         #     self.data[i] = generateRandomTasks(self.xlim)
         self.gantt = gnt
-        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
+        self.inside_figure = fig
+        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], False)
         return fig
 
-    def update_gantt(self, data, location_names, is_click=False):
+    def _clear(self):
+        if self.inside_figure:
+            for item in self.inside_figure.canvas.get_tk_widget().find_all():
+                self.inside_figure.canvas.get_tk_widget().delete(item)
+
+    def update_gantt(self, data, location_names, is_click=True):
         begin_time = datetime.now().timestamp() * 1000
         def construct_location_name(d):
             a = int(d)
@@ -148,33 +164,54 @@ class Visualize:
 
         y_ticks = list(np.arange(self.location_gap + (self.bar_height / 2), self.ylim, self.location_distance))
         y_labels = [construct_location_name(location_names[i]) for i in range(self.number_of_locations)]
+        y_labels.reverse()
         self.gantt.set_yticks(y_ticks)
         self.gantt.set_yticklabels(y_labels)
 
         self.gantt.set_ylim(self.visible_y[0], self.visible_y[1])
         self.gantt.set_xlim(self.visible_x[0], self.visible_x[1])
 
+        def get_bar_y_position(par, loc):
+            return (loc * (par.canvas_bar_height + (2 * par.canvas_location_gap))) + par.canvas_location_gap + par.canvas_y_range[0]
+
         def get_bar_position(par, loc):
             return (loc * (par.bar_height + (2 * par.location_gap))) + par.location_gap
 
+        def scale_length_in_x(val, src, dst):
+            l = scale_point_in_range(0, src, dst)
+            r = scale_point_in_range(val, src, dst)
+            return r - l
         color = 'tab:blue'
 
-        for i in range(self.number_of_locations):
-            self.gantt.broken_barh(data[i], (get_bar_position(self, i), self.bar_height), facecolors=color)
+        if is_click is True:
+            self._clear()
+        # if is_click is False:
+        #     for i in range(self.number_of_locations):
+        #         self.gantt.broken_barh(data[i], (get_bar_position(self, i), self.bar_height), facecolors=color)
         self.gantt.figure.canvas.draw()
 
-
-        if is_click is True:
-            # img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-            idraw = ImageDraw.Draw(self.original_image_object)
-            idraw.rectangle(((100, 100), (200, 200)), fill="blue")
-            # self.original_image_object.show()
-            self.itkimage = ImageTk.PhotoImage(self.original_image_object)
+        img = PIL.Image.frombytes('RGB', self.inside_figure.canvas.get_width_height(), self.inside_figure.canvas.tostring_rgb())
+        idraw = ImageDraw.Draw(img)
+        for i in range(self.number_of_locations):
+            for bar in data[i]:
+                idraw.rectangle(((scale_point_in_range(bar[0], self.visible_x, self.canvas_x_range), get_bar_y_position(self, i)),
+                                 (scale_point_in_range(bar[0], self.visible_x, self.canvas_x_range) + scale_length_in_x(bar[1],
+                                                                                                                             self.visible_x,
+                                                                                                                             self.canvas_x_range),
+                                  get_bar_y_position(self, i) + self.canvas_bar_height)),
+                                fill="blue")
+        # for i in range(1000):
+        # idraw.rectangle(((200, 200), (300, 300)), fill="blue")
+        # img.show()
+        if self.itkimage is not None:
+            del self.itkimage
+        self.itkimage = ImageTk.PhotoImage(img)
+        if self.first_image is None:
+            self.first_image = vis.canvas.create_image(0, 0, anchor=NW, image=self.itkimage)
+            self.canvas.bind("<MouseWheel>", vis.mouse_scroll_event_wrapper)
+            self.canvas.pack()
+        else:
             self.canvas.itemconfig(self.first_image, image=self.itkimage)
-            # PSIZE = 200
-            # p = [300, 300]
-            # self.canvas.create_oval(p[0] - PSIZE, p[1] - PSIZE, p[0] + PSIZE, p[1] + PSIZE, fill='red', w=2)
-            # self.root.mainloop()
 
         time_taken = (datetime.now().timestamp() * 1000) - begin_time
         print("drawing time taken", time_taken, "ms")
@@ -221,10 +258,19 @@ class Visualize:
         # else:
         #     print('Released outside axes bounds but inside plot window')
 
-    def find_intersections_wrapper(self, clickEvent):
-        print('clicked here')
-        data = self.updateData()
-        self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], True)
+    def mouse_scroll_event_wrapper(self, mouseEvent):
+        if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
+            xdata = scale_point_in_range(mouseEvent.x, self.canvas_x_range, self.visible_x)
+            ydata = scale_point_in_range(mouseEvent.y, self.canvas_y_range, self.visible_y)
+            if mouseEvent.delta > 0:  # scroll up
+                self.handleZoomIn(xdata, ydata)
+            else:  # scroll down
+                self.handleZoomOut(xdata, ydata)
+            # data = self.updateData()
+            # self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], True)
+        else:
+            print('outside chart')
+
 
 def fig2img(fig):
     return PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
@@ -242,16 +288,6 @@ if __name__ == "__main__":
 
     vis = Visualize(root)
     fig = vis.initiate_gantt_draw()
-
-    img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-    draw = ImageDraw.Draw(img)
-    draw.rectangle(((0, 00), (100, 100)), fill="black")
-    # img.show()
-    tkimage = ImageTk.PhotoImage(img)
-    vis.original_image_object = img
-    vis.first_image = vis.canvas.create_image(0, 0, anchor=NW, image=tkimage)
-    vis.canvas.bind("<Button-1>", vis.find_intersections_wrapper)
-    vis.canvas.pack()
 
 
     root.mainloop()
