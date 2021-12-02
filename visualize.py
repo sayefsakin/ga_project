@@ -1,5 +1,6 @@
 import copy
 import io
+import math
 import tkinter
 
 import PIL
@@ -75,39 +76,22 @@ class Visualize:
 
     def handleZoomIn(self, x_value, y_value):
         print(x_value, y_value, 'zoom-in')
-        # dont do the vertical zoom now
-        if self.visible_x[0] + (2 * self.scroll_unit) < self.visible_x[1]:
-            self.visible_x[0] = self.visible_x[0] + self.scroll_unit
-            self.visible_x[1] = self.visible_x[1] - self.scroll_unit
+        vis_mid = ((self.visible_x[0] + self.visible_x[1]) / 2)
+        temp_displace = (x_value - vis_mid) / vis_mid * self.scroll_unit
 
-            x_displace = x_value - ((self.visible_x[0] + self.visible_x[1]) / 2)
-            if x_displace > 0:
-                x_displace = min((self.kd_store.parsed_data.info['domain'][1] - self.visible_x[1]), x_displace)
-            else:
-                x_displace = max((self.kd_store.parsed_data.info['domain'][0] - self.visible_x[0]), x_displace)
-            self.visible_x[0] += x_displace
-            self.visible_x[1] += x_displace
+        if self.visible_x[0] + (self.scroll_unit + temp_displace) < self.visible_x[1] - (-temp_displace + self.scroll_unit):
+            self.visible_x[0] += (self.scroll_unit + temp_displace)
+            self.visible_x[1] -= (-temp_displace + self.scroll_unit)
 
             data = self.updateData()
             self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomOut(self, x_value, y_value):
-        # print(x_value, y_value, 'zoom-out', self.kd_store.parsed_data.info['domain'][0])
-        # if (self.visible_x[0] - self.scroll_unit) >= self.kd_store.parsed_data.info['domain'][0] and \
-        #         (self.visible_x[1] + self.scroll_unit) <= self.kd_store.parsed_data.info['domain'][1]:
-        t_x = [self.visible_x[0] - self.scroll_unit, self.visible_x[1] + self.scroll_unit]
+        vis_mid = ((self.visible_x[0] + self.visible_x[1]) / 2)
+        temp_displace = (x_value - vis_mid) / vis_mid * self.scroll_unit
 
-        x_displace = x_value - ((t_x[0] + t_x[1]) / 2)
-        if x_displace > 0:
-            x_displace = min((self.kd_store.parsed_data.info['domain'][1] - t_x[1]), x_displace)
-        else:
-            x_displace = max((self.kd_store.parsed_data.info['domain'][0] - t_x[0]), x_displace)
-        t_x[0] += x_displace
-        t_x[1] += x_displace
-
-        if t_x[0] >= self.kd_store.parsed_data.info['domain'][0] and t_x[1] <= self.kd_store.parsed_data.info['domain'][1]:
-            self.visible_x[0] = t_x[0]
-            self.visible_x[1] = t_x[1]
+        self.visible_x[0] = max(self.kd_store.parsed_data.info['domain'][0], self.visible_x[0] - (self.scroll_unit + temp_displace))
+        self.visible_x[1] = min(self.kd_store.parsed_data.info['domain'][1], self.visible_x[1] + (-temp_displace + self.scroll_unit))
 
         data = self.updateData()
         self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
@@ -131,8 +115,6 @@ class Visualize:
         fig.canvas.callbacks.connect('button_press_event', self.mouse_clicked)
         fig.canvas.callbacks.connect('button_release_event', self.mouse_released)
         fig.canvas.callbacks.connect('motion_notify_event', self.mouse_moved)
-
-
 
         self.kd_store = KDStore()
         self.visible_x = copy.deepcopy(self.kd_store.parsed_data.info['domain'])
@@ -175,6 +157,7 @@ class Visualize:
 
         self.gantt.set_ylim(self.visible_y[0], self.visible_y[1])
         self.gantt.set_xlim(self.visible_x[0], self.visible_x[1])
+        self.scroll_unit = (self.visible_x[1] - self.visible_x[0]) / 10
 
         def get_bar_y_position(par, loc):
             return (loc * (par.canvas_bar_height + (2 * par.canvas_location_gap))) + par.canvas_location_gap + par.canvas_y_range[0]

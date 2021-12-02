@@ -91,9 +91,9 @@ class KDStore:
         def searchInKDTree(kd_node, sl_index, el_index, st, et):
             if kd_node.getTimeWindow() <= pixel_window:
                 if kd_node.isLeaf() is False:
-                    # if (kd_node.timestamp[1] - kd_node.timestamp[0]) / (et - st) > 0.1:
-                    for loc in range(kd_node.location[0], kd_node.location[1] + 1):
-                        data[loc].append((kd_node.timestamp[0], kd_node.timestamp[0]+1))
+                    if (kd_node.timestamp[1] - kd_node.timestamp[0]) / (et - st) > 0.5:
+                        for loc in range(kd_node.location[0], kd_node.location[1] + 1):
+                            data[loc].append((kd_node.timestamp[0], kd_node.timestamp[0]+1))
                 return
             if kd_node.isLeaf():
                 for loc in range(kd_node.location[0], kd_node.location[1] + 1):
