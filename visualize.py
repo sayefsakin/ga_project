@@ -75,7 +75,7 @@ class Visualize:
         self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'])
 
     def handleZoomIn(self, x_value, y_value):
-        print(x_value, y_value, 'zoom-in')
+        # print(x_value, y_value, 'zoom-in')
         vis_mid = ((self.visible_x[0] + self.visible_x[1]) / 2)
         temp_displace = (x_value - vis_mid) / vis_mid * self.scroll_unit
 
@@ -115,8 +115,6 @@ class Visualize:
         self.visible_x = copy.deepcopy(self.kd_store.parsed_data.info['domain'])
 
         data = self.updateData()
-        # for i in range(self.number_of_locations):
-        #     self.data[i] = generateRandomTasks(self.xlim)
         self.gantt = gnt
         self.inside_figure = fig
         self.update_gantt(data, self.kd_store.parsed_data.info['locationNames'], False)
@@ -168,9 +166,7 @@ class Visualize:
 
         if is_click is True:
             self._clear()
-        # if is_click is False:
-        #     for i in range(self.number_of_locations):
-        #         self.gantt.broken_barh(data[i], (get_bar_position(self, i), self.bar_height), facecolors=color)
+
         self.gantt.figure.canvas.draw()
 
         img = PIL.Image.frombytes('RGB', self.inside_figure.canvas.get_width_height(), self.inside_figure.canvas.tostring_rgb())
@@ -181,9 +177,7 @@ class Visualize:
                                  (scale_point_in_range(bar[1], self.visible_x, self.canvas_x_range),
                                   get_bar_y_position(self, i) + self.canvas_bar_height)),
                                 fill=bar[2])
-        # for i in range(1000):
-        # idraw.rectangle(((200, 200), (300, 300)), fill="blue")
-        # img.show()
+
         if self.itkimage is not None:
             del self.itkimage
         self.itkimage = ImageTk.PhotoImage(img)
@@ -217,29 +211,24 @@ class Visualize:
         if self.old_text:
             self.canvas.delete(self.old_text)
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
-            # print('actual x y', mouseEvent.x, mouseEvent.y)
-            # print(xdata, ydata, "mouse move")
             if self.clicked_point is not None:
                 if self.clicked_point[0] != mouseEvent.x or self.clicked_point[1] != mouseEvent.y:
                     xdata = scale_point_in_range(mouseEvent.x, self.canvas_x_range, self.visible_x)
                     ydata = scale_point_in_range(mouseEvent.y, self.canvas_y_range, self.visible_y)
                     pre_x = scale_point_in_range(self.clicked_point[0], self.canvas_x_range, self.visible_x)
                     self.handlePanning(xdata, pre_x)
-                    print('trigger panning from ', self.clicked_point, xdata, ydata)
             self.clicked_point = [mouseEvent.x, mouseEvent.y]
         else:
             print('outside chart')
 
     def mouse_release_event_wrapper(self, mouseEvent):
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
-            # print('release x y', mouseEvent.x, mouseEvent.y)
             self.clicked_point = None
         else:
             print('outside chart')
 
     def mouse_click_event_wrapper(self, mouseEvent):
         if self.canvas_x_range[0] < mouseEvent.x < self.canvas_x_range[1] and self.canvas_y_range[0] < mouseEvent.y < self.canvas_y_range[1]:
-            # print('click x y', mouseEvent.x, mouseEvent.y)
 
             def get_location_from_ydata(par, y_pos):
                 return int((y_pos - par.canvas_location_gap - par.canvas_y_range[0]) / (par.canvas_bar_height + (2 * par.canvas_location_gap)))
