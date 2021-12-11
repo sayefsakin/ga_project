@@ -22,7 +22,7 @@ def natural_sort(l):
     alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
     return sorted(l, key = alphanum_key)
 
-
+# adopted from https://github.com/hdc-arizona/traveler-integrated/blob/main/data_store/_otf2_functions.py
 class DataParser:
     def __init__(self):
         self.sortedEventsByLocation = None
@@ -144,96 +144,3 @@ class DataParser:
             print('Lines skipped because they are not yet supported: %d' % unsupportedSkippedLines)
             self.info['locationNames'] = natural_sort(self.sortedEventsByLocation.keys())
             self.info['domain'] = [min_time, max_time]
-
-    def combineIntervals(self):
-        self.intervals = {}
-
-        # Helper function for creating interval objects
-        def createNewInterval(event, lastEvent, intervalId):
-            newInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId, 'parent': None, 'children': []}
-            # Copy all of the attributes from the OTF2 events into the interval object. If the values
-            # differ (or it's the timestamp), put them in nested enter / leave objects. Otherwise, put
-            # them directly in the interval object
-            for attr in set(event.keys()).union(lastEvent.keys()):
-                if attr not in event:
-                    newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
-                elif attr not in lastEvent:  # pylint: disable=E1135
-                    newInterval['leave'][attr] = event[attr]
-                elif attr != 'Timestamp' and attr != 'metrics' and event[attr] == lastEvent[attr]:  # pylint: disable=unsubscriptable-object
-                    newInterval[attr] = event[attr]
-                else:
-                    if attr == 'Location':
-                        print('')
-                        print('\nWARNING: ENTER and LEAVE have different locations')
-                    newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
-                    newInterval['leave'][attr] = event[attr]
-            return newInterval
-
-        print('Combining enter / leave events into intervals (.=2500 intervals)')
-        numIntervals = mismatchedIntervals = missingPrimitives = 0
-
-        # Keep track of the earliest and latest timestamps we see
-        intervalDomain = [float('inf'), float('-inf')]
-
-        # Combine the sorted enter / leave events into intervals
-        for eventList in self.sortedEventsByLocation.values():
-            lastEventStack = []
-            currentInterval = None
-            for _, event in eventList:
-                assert event is not None
-                intervalId = str(numIntervals)
-                if event['Event'] == 'ENTER':
-                    # check if there is an enter event in the stack, push a dummy leave event
-                    if len(lastEventStack) > 0:
-                        dummyEvent = copy.deepcopy(lastEventStack[-1])
-                        dummyEvent['Event'] = 'LEAVE'
-                        dummyEvent['Timestamp'] = event['Timestamp'] - 1  # add a new dummy leave event in 1 time unit ago
-                        if 'metrics' in event:
-                            dummyEvent['metrics'] = copy.deepcopy(event['metrics'])
-                        currentInterval = createNewInterval(dummyEvent, lastEventStack[-1], intervalId)
-                    lastEventStack.append(event)
-                elif event['Event'] == 'LEAVE':
-                    # Finish a interval
-                    if len(lastEventStack) == 0:
-                        print('')
-                        print('\nWARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
-                        continue
-                    lastEvent = lastEventStack.pop()
-                    currentInterval = createNewInterval(event, lastEvent, intervalId)
-                    if len(lastEventStack) > 0:
-                        lastEventStack[-1]['Timestamp'] = event['Timestamp'] + 1  # move the enter event to after 1 time unit
-                if currentInterval is not None:
-                    # Count whether the primitive attribute is missing or differed between enter / leave
-                    if 'Primitive' not in currentInterval:
-                        if 'Primitive' not in currentInterval['enter'] or 'Primitive' not in currentInterval['leave']:
-                            missingPrimitives += 1
-                            currentInterval['Primitive'] = '(primitive name missing)'
-                        else:
-                            mismatchedIntervals += 1
-                            # Use the enter event's primitive name
-                            currentInterval['Primitive'] = currentInterval['enter']['Primitive']
-                    self.intervals[intervalId] = currentInterval
-                    # Update intervalDomain
-                    intervalDomain[0] = min(intervalDomain[0], currentInterval['enter']['Timestamp'])
-                    intervalDomain[1] = max(intervalDomain[1], currentInterval['leave']['Timestamp'])
-                    # Log that we've finished the finished interval
-                    numIntervals += 1
-                    if numIntervals % 2500 == 0:
-                        print('.', end='')
-                    if numIntervals % 100000 == 0:
-                        print('processed %i intervals' % numIntervals)
-                currentInterval = None
-            # Make sure there are no trailing ENTER events
-            if len(lastEventStack) > 0:
-                print('')
-                print('\nWARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
-
-        # Clean up temporary lists
-        del self.sortedEventsByLocation
-
-        # Store the full domain of the data in the datasets' info
-        self.info['intervalDomain'] = intervalDomain
-
-        print('')
-        print('Finished creating %i intervals; %i had no primitive name; %i had mismatching primitives (ENTER primitive used)' % (numIntervals,
-                                                                                                                              missingPrimitives, mismatchedIntervals))
